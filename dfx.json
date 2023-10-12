@@ -1,0 +1,10 @@
+{
+  "canisters": {
+    "multisig_index": {
+      "type": "rust",
+      "package": "multisig_index",
+      "candid": "candid/multisig_index.did",
+      "wasm": "wasm/multisig_index.wasm.gz"
+    }
+  }
+}
