@@ -1,5 +1,25 @@
 type Result = variant { Ok : text; Err : text };
+type Tokens = record { e8s : nat64 };
+type TransactionData = record {
+  status : TransactionStatus;
+  cmc_transfer_block_index : opt nat64;
+  cycles_amount : opt nat;
+  error_message : opt text;
+  initialized_by : principal;
+  created_at : nat64;
+  icp_transfer_block_index : nat64;
+  icp_amount : opt Tokens;
+};
+type TransactionStatus = variant {
+  CmcTransactionFailed;
+  IcpTransactionFailed;
+  Success;
+  CycleTopupFailed;
+  IcpToCmcFailed;
+  IcpToIndexFailed;
+};
 service : {
   get_cycles : () -> (nat64) query;
+  get_transactions : (opt TransactionStatus) -> (vec TransactionData) query;
   top_up_self : (nat64) -> (Result);
 }

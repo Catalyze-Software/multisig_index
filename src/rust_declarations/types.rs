@@ -1,4 +1,5 @@
-use candid::{CandidType, Principal};
+use candid::{CandidType, Nat, Principal};
+use ic_ledger_types::Tokens;
 use serde::Deserialize;
 use std::borrow::Cow;
 
@@ -15,6 +16,40 @@ pub struct MultisigData {
 }
 
 impl Storable for MultisigData {
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug, PartialEq)]
+pub enum TransactionStatus {
+    IcpToIndexFailed,
+    IcpToCmcFailed,
+    IcpTransactionFailed,
+    CmcTransactionFailed,
+    CycleTopupFailed,
+    Success,
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct TransactionData {
+    pub icp_transfer_block_index: u64,
+    pub cmc_transfer_block_index: Option<u64>,
+    pub icp_amount: Option<Tokens>,
+    pub cycles_amount: Option<Nat>,
+    pub initialized_by: Principal,
+    pub created_at: u64,
+    pub status: TransactionStatus,
+    pub error_message: Option<String>,
+}
+
+impl Storable for TransactionData {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }

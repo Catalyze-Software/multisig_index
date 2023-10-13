@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use candid::Principal;
-use ic_cdk::id;
+use ic_cdk::{api::time, id};
 use ic_ledger_types::{transfer, AccountIdentifier, Memo, Subaccount, Tokens, TransferArgs};
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
@@ -10,7 +10,7 @@ use ic_stable_structures::{
 
 use crate::rust_declarations::{
     cmc_service::{CmcService, NotifyTopUpArg, NotifyTopUpResult},
-    types::MultisigData,
+    types::{MultisigData, TransactionData, TransactionStatus},
 };
 
 use super::ledger::Ledger;
@@ -36,6 +36,12 @@ thread_local! {
         )
     );
 
+    pub static TOP_UP_TRANSACTIONS: RefCell<StableBTreeMap<u64, TransactionData, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
+        )
+    );
+
 }
 
 pub struct Store;
@@ -45,14 +51,30 @@ impl Store {
         ic_cdk::api::canister_balance()
     }
 
-    pub async fn top_up_self(caller: Principal, blockheight: u64) -> Result<String, String> {
+    pub fn get_transactions(status: Option<TransactionStatus>) -> Vec<TransactionData> {
+        TOP_UP_TRANSACTIONS.with(|t| {
+            t.borrow()
+                .iter()
+                .filter(|(_, v)| {
+                    if let Some(_status) = status.clone() {
+                        v.status == _status
+                    } else {
+                        true
+                    }
+                })
+                .map(|(_, v)| v.clone())
+                .collect()
+        })
+    }
+
+    pub async fn top_up_self(caller: Principal, icp_block_index: u64) -> Result<String, String> {
         // create principal from the canister ids
         let ledger_principal =
             Principal::from_text(LEDGER_CANISTER_ID).expect("invalid ledger principal");
         let cmc_principal = Principal::from_text(CMC_CANISTER_ID).expect("invalid cmc principal");
 
         // validate the transaction done to this canister and return the amount
-        match Ledger::validate_transaction(caller, blockheight).await {
+        match Ledger::validate_transaction(caller, icp_block_index).await {
             Ok(amount) => {
                 let ledger_args = TransferArgs {
                     memo: MEMO_TOP_UP_CANISTER,
@@ -64,12 +86,11 @@ impl Store {
                 };
 
                 // transfer the received amount to the cmc canister
-                let transfer_result = transfer(ledger_principal, ledger_args).await;
-                match transfer_result {
+                match transfer(ledger_principal, ledger_args).await {
                     Ok(transaction_result) => match transaction_result {
-                        Ok(block_index) => {
+                        Ok(cmc_block_index) => {
                             let topup_args = NotifyTopUpArg {
-                                block_index,
+                                block_index: cmc_block_index,
                                 canister_id: id(),
                             };
                             let topup_result =
@@ -77,19 +98,120 @@ impl Store {
                             match topup_result {
                                 Ok((topup_resonse,)) => match topup_resonse {
                                     NotifyTopUpResult::Ok(cycles) => {
+                                        TOP_UP_TRANSACTIONS.with(|t| {
+                                            t.borrow_mut().insert(
+                                                icp_block_index,
+                                                TransactionData {
+                                                    icp_transfer_block_index: icp_block_index,
+                                                    cmc_transfer_block_index: Some(cmc_block_index),
+                                                    icp_amount: Some(amount),
+                                                    initialized_by: caller,
+                                                    cycles_amount: Some(cycles.clone()),
+                                                    created_at: time(),
+                                                    error_message: None,
+                                                    status: TransactionStatus::Success,
+                                                },
+                                            )
+                                        });
                                         Ok(format!("topped up with '{}' cycles", cycles))
                                     }
-                                    NotifyTopUpResult::Err(err) => Err(format!("{:?}", err)),
+                                    NotifyTopUpResult::Err(err) => {
+                                        TOP_UP_TRANSACTIONS.with(|t| {
+                                            t.borrow_mut().insert(
+                                                icp_block_index,
+                                                TransactionData {
+                                                    icp_transfer_block_index: icp_block_index,
+                                                    cmc_transfer_block_index: Some(cmc_block_index),
+                                                    icp_amount: Some(amount),
+                                                    initialized_by: caller,
+                                                    cycles_amount: None,
+                                                    created_at: time(),
+                                                    error_message: Some(format!("{:?}", err)),
+                                                    status: TransactionStatus::CycleTopupFailed,
+                                                },
+                                            )
+                                        });
+                                        Err(format!("{:?}", err))
+                                    }
                                 },
-                                Err((_, err)) => Err(err),
+                                Err((_, err)) => {
+                                    TOP_UP_TRANSACTIONS.with(|t| {
+                                        t.borrow_mut().insert(
+                                            icp_block_index,
+                                            TransactionData {
+                                                icp_transfer_block_index: icp_block_index,
+                                                cmc_transfer_block_index: Some(cmc_block_index),
+                                                icp_amount: Some(amount),
+                                                initialized_by: caller,
+                                                cycles_amount: None,
+                                                created_at: time(),
+                                                error_message: Some(err.clone()),
+                                                status: TransactionStatus::CmcTransactionFailed,
+                                            },
+                                        )
+                                    });
+
+                                    Err(err)
+                                }
                             }
                         }
-                        Err(err) => Err(err.to_string()),
+                        Err(err) => {
+                            TOP_UP_TRANSACTIONS.with(|t| {
+                                t.borrow_mut().insert(
+                                    icp_block_index,
+                                    TransactionData {
+                                        icp_transfer_block_index: icp_block_index,
+                                        cmc_transfer_block_index: None,
+                                        icp_amount: Some(amount),
+                                        initialized_by: caller,
+                                        cycles_amount: None,
+                                        created_at: time(),
+                                        error_message: Some(err.to_string()),
+                                        status: TransactionStatus::CmcTransactionFailed,
+                                    },
+                                )
+                            });
+                            Err(err.to_string())
+                        }
                     },
-                    Err((_, err)) => Err(err),
+                    Err((_, err)) => {
+                        TOP_UP_TRANSACTIONS.with(|t| {
+                            t.borrow_mut().insert(
+                                icp_block_index,
+                                TransactionData {
+                                    icp_transfer_block_index: icp_block_index,
+                                    cmc_transfer_block_index: None,
+                                    icp_amount: Some(amount),
+                                    initialized_by: caller,
+                                    cycles_amount: None,
+                                    created_at: time(),
+                                    error_message: Some(err.clone()),
+                                    status: TransactionStatus::CmcTransactionFailed,
+                                },
+                            )
+                        });
+                        Err(err)
+                    }
                 }
             }
-            Err(err) => Err(err),
+            Err(err) => {
+                TOP_UP_TRANSACTIONS.with(|t| {
+                    t.borrow_mut().insert(
+                        icp_block_index,
+                        TransactionData {
+                            icp_transfer_block_index: icp_block_index,
+                            cmc_transfer_block_index: None,
+                            icp_amount: None,
+                            initialized_by: caller,
+                            cycles_amount: None,
+                            created_at: time(),
+                            error_message: Some(err.clone()),
+                            status: TransactionStatus::IcpTransactionFailed,
+                        },
+                    )
+                });
+                Err(err)
+            }
         }
     }
 }

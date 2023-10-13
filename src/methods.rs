@@ -1,10 +1,18 @@
 use ic_cdk::{caller, query, update};
 
-use crate::logic::store::Store;
+use crate::{
+    logic::store::Store,
+    rust_declarations::types::{TransactionData, TransactionStatus},
+};
 
 #[query]
 fn get_cycles() -> u64 {
     Store::get_cycles()
+}
+
+#[query]
+fn get_transactions(status: Option<TransactionStatus>) -> Vec<TransactionData> {
+    Store::get_transactions(status)
 }
 
 #[update]
