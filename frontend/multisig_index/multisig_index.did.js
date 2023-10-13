@@ -2,12 +2,11 @@ export const idlFactory = ({ IDL }) => {
   const Tokens = IDL.Record({ 'e8s' : IDL.Nat64 });
   const Result = IDL.Variant({ 'Ok' : Tokens, 'Err' : IDL.Text });
   const TransactionStatus = IDL.Variant({
-    'CmcTransactionFailed' : IDL.Null,
-    'IcpTransactionFailed' : IDL.Null,
+    'CyclesToIndexFailed' : IDL.Null,
     'Success' : IDL.Null,
-    'CycleTopupFailed' : IDL.Null,
     'IcpToCmcFailed' : IDL.Null,
     'IcpToIndexFailed' : IDL.Null,
+    'Pending' : IDL.Null,
   });
   const TransactionData = IDL.Record({
     'status' : TransactionStatus,

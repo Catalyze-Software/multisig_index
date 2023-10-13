@@ -16,12 +16,11 @@ export interface TransactionData {
   'icp_transfer_block_index' : bigint,
   'icp_amount' : [] | [Tokens],
 }
-export type TransactionStatus = { 'CmcTransactionFailed' : null } |
-  { 'IcpTransactionFailed' : null } |
+export type TransactionStatus = { 'CyclesToIndexFailed' : null } |
   { 'Success' : null } |
-  { 'CycleTopupFailed' : null } |
   { 'IcpToCmcFailed' : null } |
-  { 'IcpToIndexFailed' : null };
+  { 'IcpToIndexFailed' : null } |
+  { 'Pending' : null };
 export interface _SERVICE {
   'get_cmc_icp_balance' : ActorMethod<[], Result>,
   'get_cycles' : ActorMethod<[], bigint>,

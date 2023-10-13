@@ -12,12 +12,11 @@ type TransactionData = record {
   icp_amount : opt Tokens;
 };
 type TransactionStatus = variant {
-  CmcTransactionFailed;
-  IcpTransactionFailed;
+  CyclesToIndexFailed;
   Success;
-  CycleTopupFailed;
   IcpToCmcFailed;
   IcpToIndexFailed;
+  Pending;
 };
 service : {
   get_cmc_icp_balance : () -> (Result);
