@@ -1,0 +1,5 @@
+type Result = variant { Ok : text; Err : text };
+service : {
+  get_cycles : () -> (nat64) query;
+  top_up_self : (nat64) -> (Result);
+}
