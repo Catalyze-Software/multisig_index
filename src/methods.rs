@@ -1,4 +1,5 @@
 use ic_cdk::{caller, query, update};
+use ic_ledger_types::Tokens;
 
 use crate::{
     logic::store::Store,
@@ -8,6 +9,11 @@ use crate::{
 #[query]
 fn get_cycles() -> u64 {
     Store::get_cycles()
+}
+
+#[update]
+async fn get_cmc_icp_balance() -> Result<Tokens, String> {
+    Store::get_cmc_icp_balance().await
 }
 
 #[query]

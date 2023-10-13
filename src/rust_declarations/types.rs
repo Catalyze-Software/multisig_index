@@ -31,10 +31,9 @@ impl Storable for MultisigData {
 pub enum TransactionStatus {
     IcpToIndexFailed,
     IcpToCmcFailed,
-    IcpTransactionFailed,
-    CmcTransactionFailed,
-    CycleTopupFailed,
+    CyclesToIndexFailed,
     Success,
+    Pending,
 }
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
@@ -59,4 +58,16 @@ impl Storable for TransactionData {
     }
 
     const BOUND: Bound = Bound::Unbounded;
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub enum UpdateCycleBalanceArgs {
+    Add(Nat),
+    Subtract(Nat),
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub enum UpdateIcpBalanceArgs {
+    Add(Tokens),
+    Subtract(Tokens),
 }

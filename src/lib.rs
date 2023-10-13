@@ -1,6 +1,7 @@
 pub mod methods;
 
 pub mod logic {
+    pub mod cmc;
     pub mod ledger;
     pub mod store;
 }

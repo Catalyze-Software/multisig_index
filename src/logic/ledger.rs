@@ -1,13 +1,23 @@
 use candid::Principal;
 use ic_cdk::id;
 use ic_ledger_types::{
-    query_archived_blocks, query_blocks, AccountIdentifier, Block, BlockIndex, GetBlocksArgs,
-    Tokens, DEFAULT_SUBACCOUNT, MAINNET_LEDGER_CANISTER_ID,
+    query_archived_blocks, query_blocks, transfer, AccountIdentifier, Block, BlockIndex,
+    GetBlocksArgs, Tokens, TransferArgs, DEFAULT_SUBACCOUNT, MAINNET_LEDGER_CANISTER_ID,
 };
 
 pub struct Ledger {}
 
 impl Ledger {
+    pub async fn transfer_icp(args: TransferArgs) -> Result<u64, String> {
+        match transfer(MAINNET_LEDGER_CANISTER_ID, args).await {
+            Ok(result) => match result {
+                Ok(block_index) => Ok(block_index),
+                Err(err) => Err(err.to_string()),
+            },
+            Err((_, err)) => Err(err),
+        }
+    }
+
     // This method checks if the transaction is send and received from the given principal
     pub async fn validate_transaction(
         principal: Principal,
