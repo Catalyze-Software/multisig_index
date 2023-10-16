@@ -1,5 +1,5 @@
-use ic_cdk::{caller, query, update};
-use ic_ledger_types::Tokens;
+use candid::Principal;
+use ic_cdk::{caller, id, query, update};
 
 use crate::{
     logic::store::Store,
@@ -12,8 +12,13 @@ fn get_cycles() -> u64 {
 }
 
 #[update]
-async fn get_cmc_icp_balance() -> Result<Tokens, String> {
-    Store::get_cmc_icp_balance().await
+async fn get_cmc_icp_balance() -> Result<u64, String> {
+    Store::get_icp_balance(id()).await
+}
+
+#[query]
+async fn get_caller_local_balance() -> u64 {
+    Store::get_caller_local_icp_balance(caller())
 }
 
 #[query]
@@ -22,8 +27,8 @@ fn get_transactions(status: Option<TransactionStatus>) -> Vec<TransactionData> {
 }
 
 #[update]
-async fn top_up_self(blockheight: u64) -> Result<String, String> {
-    Store::top_up_self(caller(), blockheight).await
+async fn spawn_multisig(blockheight: u64) -> Result<Principal, String> {
+    Store::spawn_multisig(caller(), blockheight).await
 }
 
 // Method used to save the candid interface to a file

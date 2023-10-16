@@ -1,9 +1,9 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 
-export type Result = { 'Ok' : Tokens } |
+export type Result = { 'Ok' : bigint } |
   { 'Err' : string };
-export type Result_1 = { 'Ok' : string } |
+export type Result_1 = { 'Ok' : Principal } |
   { 'Err' : string };
 export interface Tokens { 'e8s' : bigint }
 export interface TransactionData {
@@ -16,17 +16,19 @@ export interface TransactionData {
   'icp_transfer_block_index' : bigint,
   'icp_amount' : [] | [Tokens],
 }
-export type TransactionStatus = { 'CyclesToIndexFailed' : null } |
+export type TransactionStatus = { 'InsufficientIcp' : null } |
+  { 'CyclesToIndexFailed' : null } |
   { 'Success' : null } |
   { 'IcpToCmcFailed' : null } |
   { 'IcpToIndexFailed' : null } |
   { 'Pending' : null };
 export interface _SERVICE {
+  'get_caller_local_balance' : ActorMethod<[], bigint>,
   'get_cmc_icp_balance' : ActorMethod<[], Result>,
   'get_cycles' : ActorMethod<[], bigint>,
   'get_transactions' : ActorMethod<
     [[] | [TransactionStatus]],
     Array<TransactionData>
   >,
-  'top_up_self' : ActorMethod<[bigint], Result_1>,
+  'spawn_multisig' : ActorMethod<[bigint], Result_1>,
 }

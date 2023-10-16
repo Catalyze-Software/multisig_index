@@ -32,6 +32,7 @@ pub enum TransactionStatus {
     IcpToIndexFailed,
     IcpToCmcFailed,
     CyclesToIndexFailed,
+    InsufficientIcp,
     Success,
     Pending,
 }

@@ -1,5 +1,5 @@
-type Result = variant { Ok : Tokens; Err : text };
-type Result_1 = variant { Ok : text; Err : text };
+type Result = variant { Ok : nat64; Err : text };
+type Result_1 = variant { Ok : principal; Err : text };
 type Tokens = record { e8s : nat64 };
 type TransactionData = record {
   status : TransactionStatus;
@@ -12,6 +12,7 @@ type TransactionData = record {
   icp_amount : opt Tokens;
 };
 type TransactionStatus = variant {
+  InsufficientIcp;
   CyclesToIndexFailed;
   Success;
   IcpToCmcFailed;
@@ -19,8 +20,9 @@ type TransactionStatus = variant {
   Pending;
 };
 service : {
+  get_caller_local_balance : () -> (nat64) query;
   get_cmc_icp_balance : () -> (Result);
   get_cycles : () -> (nat64) query;
   get_transactions : (opt TransactionStatus) -> (vec TransactionData) query;
-  top_up_self : (nat64) -> (Result_1);
+  spawn_multisig : (nat64) -> (Result_1);
 }

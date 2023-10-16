@@ -24,7 +24,7 @@ use ic_stable_structures::{
 };
 
 use crate::rust_declarations::types::{
-    MultisigData, TransactionData, TransactionStatus, UpdateCycleBalanceArgs, UpdateIcpBalanceArgs,
+    MultisigData, TransactionData, TransactionStatus, UpdateIcpBalanceArgs,
 };
 
 use super::{cmc::CMC, ledger::Ledger};
@@ -36,6 +36,7 @@ type GroupIdentifier = String;
 pub static MEMO_TOP_UP_CANISTER: Memo = Memo(1347768404_u64);
 pub static MEMO_CREATE_CANISTER: Memo = Memo(1095062083_u64);
 pub static ICP_TRANSACTION_FEE: Tokens = Tokens::from_e8s(10000);
+pub static MIN_E8S_FOR_SPINUP: Tokens = Tokens::from_e8s(100000000);
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
@@ -59,13 +60,6 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2))),
         )
     );
-
-    pub static CALLER_CYCLE_BALANCE: RefCell<StableBTreeMap<String, u128, Memory>> = RefCell::new(
-        StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2))),
-        )
-    );
-
 }
 
 pub struct Store;
@@ -75,20 +69,26 @@ impl Store {
         ic_cdk::api::canister_balance()
     }
 
-    pub async fn get_cmc_icp_balance() -> Result<Tokens, String> {
-        // let result = check_callers_balance().await;
+    pub async fn get_icp_balance(caller: Principal) -> Result<u64, String> {
         let result = account_balance(
             MAINNET_LEDGER_CANISTER_ID,
             AccountBalanceArgs {
-                account: AccountIdentifier::new(&id(), &DEFAULT_SUBACCOUNT),
+                account: AccountIdentifier::new(&caller, &DEFAULT_SUBACCOUNT),
             },
         )
         .await;
 
         match result {
-            Ok(balance) => Ok(balance),
+            Ok(balance) => Ok(balance.e8s()),
             Err((_, err)) => Err(err),
         }
+    }
+
+    pub fn get_caller_local_icp_balance(caller: Principal) -> u64 {
+        CALLER_ICP_BALANCE.with(|c| {
+            let balance = c.borrow();
+            balance.get(&caller.to_string()).unwrap_or(0)
+        })
     }
 
     pub fn get_transactions(status: Option<TransactionStatus>) -> Vec<TransactionData> {
@@ -112,6 +112,7 @@ impl Store {
             if let Some(transaction) = t.borrow().get(&block_index) {
                 return match transaction.status {
                     TransactionStatus::IcpToCmcFailed => true,
+                    TransactionStatus::InsufficientIcp => true,
                     _ => false,
                 };
             } else {
@@ -120,7 +121,7 @@ impl Store {
         })
     }
 
-    pub async fn top_up_self(caller: Principal, icp_block_index: u64) -> Result<String, String> {
+    pub async fn top_up_self(caller: Principal, icp_block_index: u64) -> Result<Nat, String> {
         // check if the block is already used
         if !Self::is_valid_block(icp_block_index) {
             return Err("Transaction already processed".to_string());
@@ -157,6 +158,22 @@ impl Store {
                     created_at_time: None,
                 };
 
+                // Check if the transfer amount is lower as the minimum amount needed to spin up a canister
+                if amount < MIN_E8S_FOR_SPINUP {
+                    // In case the transfer amount is to low, check if the caller has enough previous balance to spin up a canister
+                    let prev_amount = Tokens::from_e8s(Self::get_caller_local_icp_balance(caller));
+
+                    // if the transfered amount + the previous balance is still to low, return an error
+                    if (amount + prev_amount) < MIN_E8S_FOR_SPINUP {
+                        transaction_data.icp_amount = Some(amount);
+                        transaction_data.status = TransactionStatus::InsufficientIcp;
+                        transaction_data.error_message =
+                            Some("Amount too low to spin up a canister".to_string());
+                        Self::insert_transaction_data(icp_block_index, transaction_data);
+                        return Err("Amount too low to spin up a canister".to_string());
+                    }
+                }
+
                 // Pass the amount received from the user, from this canister to the cycles management canister (minus the fee)
                 match Ledger::transfer_icp(ledger_args).await {
                     // If the transaction is successfull, return the block index of the transaction
@@ -169,23 +186,13 @@ impl Store {
                         // Trigger the call to send the cycles to this canister
                         match CMC::top_up_self(cmc_block_index).await {
                             Ok(cycles) => {
-                                //
-                                // TODO: Not sure if we want to keep track of the user cycles because the canister itself also burns cycles when it is running
-                                //       which can cause a scenario where the user has cycles but the canister is out of cycles or we are in credit with the users
-                                //       maybe we convert the ICP to cycles once the call to spin up the canister is done, this way we only need to keep track for
-                                //       a short period of time and have a "reserved" amount of cycles in case the canister spinup fails
-                                //
-                                Self::update_caller_cycle_balance(
-                                    &caller,
-                                    UpdateCycleBalanceArgs::Add(cycles.clone()),
-                                );
                                 transaction_data.cmc_transfer_block_index = Some(cmc_block_index);
                                 transaction_data.icp_amount = Some(amount);
                                 transaction_data.cycles_amount = Some(cycles.clone());
                                 transaction_data.status = TransactionStatus::Success;
 
                                 Self::insert_transaction_data(icp_block_index, transaction_data);
-                                Ok(format!("topped up with '{}' cycles", cycles))
+                                Ok(cycles)
                             }
                             Err(err) => {
                                 // if this step fails, the topup needs to be triggered manually with the cmc_block_index
@@ -208,17 +215,34 @@ impl Store {
                     }
                 }
             }
-            Err(err) => {
-                // Do not log a transaction when the transaction is invalid (spam prevention)
-                // transaction_data.status = TransactionStatus::IcpToIndexFailed;
-                // transaction_data.error_message = Some(err.clone());
-                // Self::insert_transaction_data(icp_block_index, transaction_data);
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
-    pub async fn spawn_canister(caller: &Principal, cycles: Nat) -> Result<Principal, String> {
+    pub async fn spawn_multisig(
+        caller: Principal,
+        icp_block_index: u64,
+    ) -> Result<Principal, String> {
+        let spin_up_result = Self::top_up_self(caller, icp_block_index).await;
+        match spin_up_result {
+            Ok(cycles) => {
+                let canister_id = Self::spawn_canister(cycles).await;
+                match canister_id {
+                    Ok(canister_id) => {
+                        let install_result = Self::install_canister(caller, canister_id).await;
+                        match install_result {
+                            Ok(_) => Ok(canister_id),
+                            Err(err) => Err(err),
+                        }
+                    }
+                    Err(err) => Err(err),
+                }
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    pub async fn spawn_canister(cycles: Nat) -> Result<Principal, String> {
         let args = CreateCanisterArgument {
             settings: Some(CanisterSettings {
                 controllers: Some(vec![id()]),
@@ -230,10 +254,7 @@ impl Store {
 
         let result = create_canister(args, Self::nat_to_u128(cycles.clone())).await;
         match result {
-            Ok((canister_record,)) => {
-                Self::update_caller_cycle_balance(caller, UpdateCycleBalanceArgs::Subtract(cycles));
-                Ok(canister_record.canister_id)
-            }
+            Ok((canister_record,)) => Ok(canister_record.canister_id),
             Err((_, err)) => Err(err),
         }
     }
@@ -262,27 +283,6 @@ impl Store {
         TRANSACTIONS.with(|t| {
             t.borrow_mut()
                 .insert(icp_block_index, transaction_data.clone())
-        });
-    }
-
-    fn update_caller_cycle_balance(caller: &Principal, args: UpdateCycleBalanceArgs) {
-        CALLER_CYCLE_BALANCE.with(|c| {
-            let mut balance = c.borrow_mut();
-            let current_balance = balance.get(&caller.to_string()).unwrap_or(0);
-            match args {
-                UpdateCycleBalanceArgs::Add(amount) => {
-                    balance.insert(
-                        caller.to_string(),
-                        current_balance + Self::nat_to_u128(amount),
-                    );
-                }
-                UpdateCycleBalanceArgs::Subtract(amount) => {
-                    balance.insert(
-                        caller.to_string(),
-                        current_balance - Self::nat_to_u128(amount),
-                    );
-                }
-            }
         });
     }
 
