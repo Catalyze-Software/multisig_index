@@ -9,7 +9,7 @@ use ic_stable_structures::{storable::Bound, Storable};
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct MultisigData {
     pub canister_id: Principal,
-    pub group_identifier: Principal,
+    pub group_identifier: Option<Principal>,
     pub created_by: Principal,
     pub created_at: u64,
     pub updated_at: u64,

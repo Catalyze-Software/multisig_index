@@ -1,5 +1,12 @@
 export const idlFactory = ({ IDL }) => {
   const Result = IDL.Variant({ 'Ok' : IDL.Nat64, 'Err' : IDL.Text });
+  const MultisigData = IDL.Record({
+    'updated_at' : IDL.Nat64,
+    'group_identifier' : IDL.Opt(IDL.Principal),
+    'canister_id' : IDL.Principal,
+    'created_at' : IDL.Nat64,
+    'created_by' : IDL.Principal,
+  });
   const TransactionStatus = IDL.Variant({
     'InsufficientIcp' : IDL.Null,
     'CyclesToIndexFailed' : IDL.Null,
@@ -24,12 +31,21 @@ export const idlFactory = ({ IDL }) => {
     'get_caller_local_balance' : IDL.Func([], [IDL.Nat64], ['query']),
     'get_cmc_icp_balance' : IDL.Func([], [Result], []),
     'get_cycles' : IDL.Func([], [IDL.Nat64], ['query']),
+    'get_multisig_by_group_identifier' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(MultisigData)],
+        ['query'],
+      ),
     'get_transactions' : IDL.Func(
         [IDL.Opt(TransactionStatus)],
         [IDL.Vec(TransactionData)],
         ['query'],
       ),
-    'spawn_multisig' : IDL.Func([IDL.Nat64], [Result_1], []),
+    'spawn_multisig' : IDL.Func(
+        [IDL.Nat64, IDL.Opt(IDL.Principal)],
+        [Result_1],
+        [],
+      ),
   });
 };
 export const init = ({ IDL }) => { return []; };

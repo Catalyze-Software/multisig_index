@@ -36,7 +36,9 @@ type GroupIdentifier = String;
 pub static MEMO_TOP_UP_CANISTER: Memo = Memo(1347768404_u64);
 pub static MEMO_CREATE_CANISTER: Memo = Memo(1095062083_u64);
 pub static ICP_TRANSACTION_FEE: Tokens = Tokens::from_e8s(10000);
-pub static MIN_E8S_FOR_SPINUP: Tokens = Tokens::from_e8s(100000000);
+pub static MIN_E8S_FOR_SPINUP: Tokens = Tokens::from_e8s(110000000);
+pub static CATALYZE_E8S_FEE: Tokens = Tokens::from_e8s(10000000);
+pub static CATALYZE_MULTI_SIG: &str = "fcygz-gqaaa-aaaap-abpaa-cai";
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
@@ -67,6 +69,21 @@ pub struct Store;
 impl Store {
     pub fn get_cycles() -> u64 {
         ic_cdk::api::canister_balance()
+    }
+
+    pub fn get_multisig_by_group_identifier(group_identifier: Principal) -> Option<MultisigData> {
+        ENTRIES.with(|e| {
+            e.borrow()
+                .iter()
+                .find(|(_, v)| {
+                    if let Some(_group_identifier) = v.group_identifier.clone() {
+                        _group_identifier == group_identifier
+                    } else {
+                        false
+                    }
+                })
+                .map(|(_, v)| v.clone())
+        })
     }
 
     pub async fn get_icp_balance(caller: Principal) -> Result<u64, String> {
@@ -145,18 +162,6 @@ impl Store {
             Ok(amount) => {
                 // add the amount to the callers balance
                 Self::update_caller_icp_balance(&caller, UpdateIcpBalanceArgs::Add(amount));
-                // Create the ledger arguments needed for the transfer call to the ledger canister
-                let ledger_args = TransferArgs {
-                    memo: MEMO_TOP_UP_CANISTER,
-                    amount: amount - ICP_TRANSACTION_FEE,
-                    fee: ICP_TRANSACTION_FEE,
-                    from_subaccount: None,
-                    to: AccountIdentifier::new(
-                        &MAINNET_CYCLES_MINTING_CANISTER_ID,
-                        &Subaccount::from(id()),
-                    ),
-                    created_at_time: None,
-                };
 
                 // Check if the transfer amount is lower as the minimum amount needed to spin up a canister
                 if amount < MIN_E8S_FOR_SPINUP {
@@ -174,8 +179,24 @@ impl Store {
                     }
                 }
 
+                let catalyze_amount = CATALYZE_E8S_FEE - ICP_TRANSACTION_FEE;
+                let multisig_amount = MIN_E8S_FOR_SPINUP - ICP_TRANSACTION_FEE - catalyze_amount;
+
+                // Create the ledger arguments needed for the transfer call to the ledger canister
+                let multig_spinup_ledger_args = TransferArgs {
+                    memo: MEMO_TOP_UP_CANISTER,
+                    amount: multisig_amount,
+                    fee: ICP_TRANSACTION_FEE,
+                    from_subaccount: None,
+                    to: AccountIdentifier::new(
+                        &MAINNET_CYCLES_MINTING_CANISTER_ID,
+                        &Subaccount::from(id()),
+                    ),
+                    created_at_time: None,
+                };
+
                 // Pass the amount received from the user, from this canister to the cycles management canister (minus the fee)
-                match Ledger::transfer_icp(ledger_args).await {
+                match Ledger::transfer_icp(multig_spinup_ledger_args).await {
                     // If the transaction is successfull, return the block index of the transaction
                     Ok(cmc_block_index) => {
                         // subtract the amount to the callers balance
@@ -222,6 +243,7 @@ impl Store {
     pub async fn spawn_multisig(
         caller: Principal,
         icp_block_index: u64,
+        group_identifier: Option<Principal>,
     ) -> Result<Principal, String> {
         let spin_up_result = Self::top_up_self(caller, icp_block_index).await;
         match spin_up_result {
@@ -231,7 +253,37 @@ impl Store {
                     Ok(canister_id) => {
                         let install_result = Self::install_canister(caller, canister_id).await;
                         match install_result {
-                            Ok(_) => Ok(canister_id),
+                            Ok(_) => {
+                                ENTRIES.with(|e| {
+                                    e.borrow_mut().insert(
+                                        canister_id.to_string(),
+                                        MultisigData {
+                                            canister_id,
+                                            group_identifier,
+                                            created_by: caller,
+                                            created_at: time(),
+                                            updated_at: time(),
+                                        },
+                                    )
+                                });
+
+                                let catalyze_amount = CATALYZE_E8S_FEE - ICP_TRANSACTION_FEE;
+
+                                let catalyze_fee_ledger_args = TransferArgs {
+                                    memo: Memo(0),
+                                    amount: catalyze_amount,
+                                    fee: ICP_TRANSACTION_FEE,
+                                    from_subaccount: None,
+                                    to: AccountIdentifier::new(
+                                        &Principal::from_text(CATALYZE_MULTI_SIG).unwrap(),
+                                        &DEFAULT_SUBACCOUNT,
+                                    ),
+                                    created_at_time: None,
+                                };
+
+                                let _ = Ledger::transfer_icp(catalyze_fee_ledger_args).await;
+                                Ok(canister_id)
+                            }
                             Err(err) => Err(err),
                         }
                     }

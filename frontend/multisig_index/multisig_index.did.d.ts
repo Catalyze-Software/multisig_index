@@ -1,6 +1,13 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 
+export interface MultisigData {
+  'updated_at' : bigint,
+  'group_identifier' : [] | [Principal],
+  'canister_id' : Principal,
+  'created_at' : bigint,
+  'created_by' : Principal,
+}
 export type Result = { 'Ok' : bigint } |
   { 'Err' : string };
 export type Result_1 = { 'Ok' : Principal } |
@@ -26,9 +33,13 @@ export interface _SERVICE {
   'get_caller_local_balance' : ActorMethod<[], bigint>,
   'get_cmc_icp_balance' : ActorMethod<[], Result>,
   'get_cycles' : ActorMethod<[], bigint>,
+  'get_multisig_by_group_identifier' : ActorMethod<
+    [Principal],
+    [] | [MultisigData]
+  >,
   'get_transactions' : ActorMethod<
     [[] | [TransactionStatus]],
     Array<TransactionData>
   >,
-  'spawn_multisig' : ActorMethod<[bigint], Result_1>,
+  'spawn_multisig' : ActorMethod<[bigint, [] | [Principal]], Result_1>,
 }
