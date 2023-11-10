@@ -31,6 +31,8 @@ service : {
   get_cmc_icp_balance : () -> (Result);
   get_cycles : () -> (nat64) query;
   get_multisig_by_group_identifier : (principal) -> (opt MultisigData) query;
+  get_multisigs : () -> (vec MultisigData) query;
+  get_principal_local_balance : (principal) -> (nat64) query;
   get_transactions : (opt TransactionStatus) -> (vec TransactionData) query;
   spawn_multisig : (nat64, opt principal) -> (Result_1);
 }

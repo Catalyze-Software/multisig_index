@@ -37,6 +37,8 @@ export interface _SERVICE {
     [Principal],
     [] | [MultisigData]
   >,
+  'get_multisigs' : ActorMethod<[], Array<MultisigData>>,
+  'get_principal_local_balance' : ActorMethod<[Principal], bigint>,
   'get_transactions' : ActorMethod<
     [[] | [TransactionStatus]],
     Array<TransactionData>

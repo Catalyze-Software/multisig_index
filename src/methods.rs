@@ -22,6 +22,11 @@ async fn get_caller_local_balance() -> u64 {
 }
 
 #[query]
+async fn get_principal_local_balance(principal: Principal) -> u64 {
+    Store::get_caller_local_icp_balance(principal)
+}
+
+#[query]
 fn get_transactions(status: Option<TransactionStatus>) -> Vec<TransactionData> {
     Store::get_transactions(status)
 }
@@ -29,6 +34,11 @@ fn get_transactions(status: Option<TransactionStatus>) -> Vec<TransactionData> {
 #[query]
 fn get_multisig_by_group_identifier(identifier: Principal) -> Option<MultisigData> {
     Store::get_multisig_by_group_identifier(identifier)
+}
+
+#[query]
+fn get_multisigs() -> Vec<MultisigData> {
+    Store::get_multisigs()
 }
 
 #[update]

@@ -36,6 +36,12 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(MultisigData)],
         ['query'],
       ),
+    'get_multisigs' : IDL.Func([], [IDL.Vec(MultisigData)], ['query']),
+    'get_principal_local_balance' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Nat64],
+        ['query'],
+      ),
     'get_transactions' : IDL.Func(
         [IDL.Opt(TransactionStatus)],
         [IDL.Vec(TransactionData)],

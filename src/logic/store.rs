@@ -31,8 +31,6 @@ use super::{cmc::CMC, ledger::Ledger};
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
-type GroupIdentifier = String;
-
 pub static MEMO_TOP_UP_CANISTER: Memo = Memo(1347768404_u64);
 pub static MEMO_CREATE_CANISTER: Memo = Memo(1095062083_u64);
 pub static ICP_TRANSACTION_FEE: Tokens = Tokens::from_e8s(10000);
@@ -45,7 +43,7 @@ thread_local! {
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 
 
-    pub static ENTRIES: RefCell<StableBTreeMap<GroupIdentifier, MultisigData, Memory>> = RefCell::new(
+    pub static ENTRIES: RefCell<StableBTreeMap<String, MultisigData, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
@@ -69,6 +67,10 @@ pub struct Store;
 impl Store {
     pub fn get_cycles() -> u64 {
         ic_cdk::api::canister_balance()
+    }
+
+    pub fn get_multisigs() -> Vec<MultisigData> {
+        ENTRIES.with(|e| e.borrow().iter().map(|(_, v)| v.clone()).collect())
     }
 
     pub fn get_multisig_by_group_identifier(group_identifier: Principal) -> Option<MultisigData> {
