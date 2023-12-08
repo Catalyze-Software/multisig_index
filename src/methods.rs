@@ -3,7 +3,9 @@ use ic_cdk::{caller, id, query, update};
 
 use crate::{
     logic::store::Store,
-    rust_declarations::types::{MultisigData, TransactionData, TransactionStatus},
+    rust_declarations::types::{
+        InitializeStatus, MultisigData, TransactionData, TransactionStatus,
+    },
 };
 
 #[query]
@@ -44,9 +46,14 @@ fn get_multisigs() -> Vec<MultisigData> {
 #[update]
 async fn spawn_multisig(
     blockheight: u64,
-    group_identifier: Option<Principal>,
+    group_identifier: Principal, // can be an identifier
 ) -> Result<Principal, String> {
     Store::spawn_multisig(caller(), blockheight, group_identifier).await
+}
+
+#[query]
+fn get_initialization_status(group_identifier: Principal) -> Option<InitializeStatus> {
+    Store::get_initialization_status(group_identifier)
 }
 
 // Method used to save the candid interface to a file

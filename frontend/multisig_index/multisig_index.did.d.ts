@@ -1,6 +1,9 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 
+export type InitializeStatus = { 'Error' : null } |
+  { 'Done' : null } |
+  { 'Initializing' : null };
 export interface MultisigData {
   'updated_at' : bigint,
   'group_identifier' : [] | [Principal],
@@ -33,6 +36,10 @@ export interface _SERVICE {
   'get_caller_local_balance' : ActorMethod<[], bigint>,
   'get_cmc_icp_balance' : ActorMethod<[], Result>,
   'get_cycles' : ActorMethod<[], bigint>,
+  'get_initialization_status' : ActorMethod<
+    [Principal],
+    [] | [InitializeStatus]
+  >,
   'get_multisig_by_group_identifier' : ActorMethod<
     [Principal],
     [] | [MultisigData]
@@ -43,5 +50,5 @@ export interface _SERVICE {
     [[] | [TransactionStatus]],
     Array<TransactionData>
   >,
-  'spawn_multisig' : ActorMethod<[bigint, [] | [Principal]], Result_1>,
+  'spawn_multisig' : ActorMethod<[bigint, Principal], Result_1>,
 }
