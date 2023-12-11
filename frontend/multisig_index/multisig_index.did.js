@@ -3,7 +3,6 @@ export const idlFactory = ({ IDL }) => {
   const InitializeStatus = IDL.Variant({
     'Error' : IDL.Null,
     'Done' : IDL.Null,
-    'NotInitialized' : IDL.Null,
     'Initializing' : IDL.Null,
   });
   const MultisigData = IDL.Record({

@@ -3,7 +3,6 @@ import type { ActorMethod } from '@dfinity/agent';
 
 export type InitializeStatus = { 'Error' : null } |
   { 'Done' : null } |
-  { 'NotInitialized' : null } |
   { 'Initializing' : null };
 export interface MultisigData {
   'updated_at' : bigint,

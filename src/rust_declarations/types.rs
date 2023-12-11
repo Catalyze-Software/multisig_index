@@ -28,7 +28,6 @@ impl Storable for MultisigData {
 }
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub enum InitializeStatus {
-    NotInitialized,
     Initializing,
     Done,
     Error,

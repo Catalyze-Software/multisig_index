@@ -1,4 +1,4 @@
-type InitializeStatus = variant { Error; Done; NotInitialized; Initializing };
+type InitializeStatus = variant { Error; Done; Initializing };
 type MultisigData = record {
   updated_at : nat64;
   group_identifier : opt principal;

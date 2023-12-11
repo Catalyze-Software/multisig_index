@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, convert::TryFrom};
+use std::{cell::RefCell, convert::TryFrom};
 
 use candid::{Encode, Nat, Principal};
 use ic_cdk::{
@@ -61,7 +61,11 @@ thread_local! {
         )
     );
 
-    pub static INITIALIZING: RefCell<HashMap<Principal, InitializeStatus>> = RefCell::new(HashMap::new());
+    pub static INITIALIZING: RefCell<StableBTreeMap<String, InitializeStatus, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3))),
+        )
+    );
 }
 
 pub struct Store;
@@ -245,7 +249,7 @@ impl Store {
     }
 
     pub fn get_initialization_status(group_identifier: Principal) -> Option<InitializeStatus> {
-        INITIALIZING.with(|i| i.borrow().get(&group_identifier).cloned())
+        INITIALIZING.with(|i| i.borrow().get(&group_identifier.to_string()).clone())
     }
 
     pub async fn spawn_multisig(
@@ -384,7 +388,7 @@ impl Store {
     }
 
     fn set_is_initializing(canister_id: &Principal, status: InitializeStatus) {
-        INITIALIZING.with(|i| i.borrow_mut().insert(canister_id.clone(), status));
+        INITIALIZING.with(|i| i.borrow_mut().insert(canister_id.to_string(), status));
     }
 
     fn insert_transaction_data(icp_block_index: u64, transaction_data: TransactionData) {
