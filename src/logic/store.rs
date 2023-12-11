@@ -368,7 +368,7 @@ impl Store {
 
         let ledger_args = TransferArgs {
             memo: Memo(0),
-            amount: Tokens::from_e8s(balance.unwrap_or_default()),
+            amount: Tokens::from_e8s(balance.unwrap_or_default() - ICP_TRANSACTION_FEE.e8s()),
             fee: ICP_TRANSACTION_FEE,
             from_subaccount: None,
             to: AccountIdentifier::new(&principal, &DEFAULT_SUBACCOUNT),
