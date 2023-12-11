@@ -1,3 +1,4 @@
+type InitializeStatus = variant { Error; Done; NotInitialized; Initializing };
 type MultisigData = record {
   updated_at : nat64;
   group_identifier : opt principal;
@@ -7,6 +8,7 @@ type MultisigData = record {
 };
 type Result = variant { Ok : nat64; Err : text };
 type Result_1 = variant { Ok : principal; Err : text };
+type Result_2 = variant { Ok; Err : text };
 type Tokens = record { e8s : nat64 };
 type TransactionData = record {
   status : TransactionStatus;
@@ -30,9 +32,11 @@ service : {
   get_caller_local_balance : () -> (nat64) query;
   get_cmc_icp_balance : () -> (Result);
   get_cycles : () -> (nat64) query;
+  get_initialization_status : (principal) -> (opt InitializeStatus) query;
   get_multisig_by_group_identifier : (principal) -> (opt MultisigData) query;
   get_multisigs : () -> (vec MultisigData) query;
   get_principal_local_balance : (principal) -> (nat64) query;
   get_transactions : (opt TransactionStatus) -> (vec TransactionData) query;
-  spawn_multisig : (nat64, opt principal) -> (Result_1);
+  spawn_multisig : (nat64, principal) -> (Result_1);
+  withdraw_balance : () -> (Result_2);
 }

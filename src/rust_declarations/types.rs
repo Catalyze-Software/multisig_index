@@ -26,6 +26,25 @@ impl Storable for MultisigData {
 
     const BOUND: Bound = Bound::Unbounded;
 }
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub enum InitializeStatus {
+    NotInitialized,
+    Initializing,
+    Done,
+    Error,
+}
+
+impl Storable for InitializeStatus {
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
 
 #[derive(CandidType, Deserialize, Clone, Debug, PartialEq)]
 pub enum TransactionStatus {
