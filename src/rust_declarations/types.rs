@@ -26,7 +26,7 @@ impl Storable for MultisigData {
 
     const BOUND: Bound = Bound::Unbounded;
 }
-#[derive(CandidType, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(CandidType, Deserialize, Clone, Debug)]
 pub enum InitializeStatus {
     Initializing,
     Done,

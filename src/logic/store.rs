@@ -257,19 +257,10 @@ impl Store {
         icp_block_index: u64,
         group_identifier: Principal,
     ) -> Result<Principal, String> {
-        // Handle the transaction from the user to this canister
+        Self::set_is_initializing(&group_identifier, InitializeStatus::Initializing);
         let top_up_result = Self::top_up_self(caller, icp_block_index).await;
         match top_up_result {
             Ok(cycles) => {
-                // Check if the mutlisig is already being initialized
-                if let Some(status) = Self::get_initialization_status(group_identifier.clone()) {
-                    if status == InitializeStatus::Initializing {
-                        return Err("Multsig for this group is being initialized".to_string());
-                    }
-                }
-
-                // Set the status of the multisig to initializing
-                Self::set_is_initializing(&group_identifier, InitializeStatus::Initializing);
                 let spin_up_result = Self::spawn_canister(cycles).await;
                 match spin_up_result {
                     Ok(canister_id) => {
