@@ -369,6 +369,33 @@ impl Store {
         }
     }
 
+    pub async fn withdraw_balance(principal: Principal) -> Result<(), String> {
+        let balance = CALLER_ICP_BALANCE.with(|c| c.borrow().get(&principal.to_string()));
+        if balance.unwrap_or_default() == 0 {
+            return Err("No balance found".to_string());
+        }
+
+        let ledger_args = TransferArgs {
+            memo: Memo(0),
+            amount: Tokens::from_e8s(balance.unwrap_or_default() - ICP_TRANSACTION_FEE.e8s()),
+            fee: ICP_TRANSACTION_FEE,
+            from_subaccount: None,
+            to: AccountIdentifier::new(&principal, &DEFAULT_SUBACCOUNT),
+            created_at_time: None,
+        };
+
+        match Ledger::transfer_icp(ledger_args).await {
+            Ok(_) => {
+                Self::update_caller_icp_balance(
+                    &principal,
+                    UpdateIcpBalanceArgs::Subtract(Tokens::from_e8s(balance.unwrap_or_default())),
+                );
+                Ok(())
+            }
+            Err(err) => Err(err),
+        }
+    }
+
     fn set_is_initializing(canister_id: &Principal, status: InitializeStatus) {
         INITIALIZING.with(|i| i.borrow_mut().insert(canister_id.to_string(), status));
     }

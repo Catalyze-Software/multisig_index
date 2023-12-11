@@ -56,6 +56,11 @@ fn get_initialization_status(group_identifier: Principal) -> Option<InitializeSt
     Store::get_initialization_status(group_identifier)
 }
 
+#[update]
+async fn withdraw_balance() -> Result<(), String> {
+    Store::withdraw_balance(caller()).await
+}
+
 // Method used to save the candid interface to a file
 #[test]
 pub fn candid() {
