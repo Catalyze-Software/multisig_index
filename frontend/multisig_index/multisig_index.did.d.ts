@@ -15,6 +15,8 @@ export type Result = { 'Ok' : bigint } |
   { 'Err' : string };
 export type Result_1 = { 'Ok' : Principal } |
   { 'Err' : string };
+export type Result_2 = { 'Ok' : null } |
+  { 'Err' : string };
 export interface Tokens { 'e8s' : bigint }
 export interface TransactionData {
   'status' : TransactionStatus,
@@ -51,4 +53,5 @@ export interface _SERVICE {
     Array<TransactionData>
   >,
   'spawn_multisig' : ActorMethod<[bigint, Principal], Result_1>,
+  'withdraw_balance' : ActorMethod<[], Result_2>,
 }
